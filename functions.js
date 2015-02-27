@@ -7,20 +7,20 @@
     "use strict";
     $.fn.makeGallery = function (options) {
         var parentElement = this,
-            data = parentElement.children(),
+            defaultImages = parentElement.children(),
             newGallery = null,
-            numberOfChlids = data.length - 1,
+            numberOfChlids = defaultImages.length - 1,
             settings = $.extend({
                 position: 0
             }, options),
             
             /**
              * Convert data to object
-             * @param int dataIndex
+             * @param int defaultImagesIndex
              * @return object
              */
-            convertData = function (dataIndex) {
-                var holder = data[dataIndex],
+            convertData = function (defaultImagesIndex) {
+                var holder = defaultImages[defaultImagesIndex],
                     dataAttrs = {
                         dataTitle: $(holder).attr("data-title"),
                         dataAuthor: $(holder).attr("data-author"),
@@ -36,84 +36,48 @@
              * @return void
              */
             appendNewGallery = function () {
-                var i = 0,
+                var i,
+                    defaultImagesLength = defaultImages.length,
                     imageDataHolder = null,
-                    pageing = null;
-                newGallery = $("<div class='gallery'><div class='navigationHolder'><a href='#' class='navigation' data-position='prev'><</a></div</div>");
-                $(parentElement).append(newGallery);
-                for (i = 0; i < data.length; i += 1) {
+                    pageing = "",
+                    newGalleryString = "<div class='gallery'><div class='navigationHolder' data-position='prev'><a href='#' class='navigation' data-position='prev'><</a></div>";
+                for (i = 0; i < defaultImagesLength; i++) {
                     imageDataHolder = convertData(i);
-                    $(newGallery).append("<a href='" + imageDataHolder.dataHref + "' class='picture' data-order='" + i + "'><img src='" + imageDataHolder.dataImage + "' /><ul><li>" + imageDataHolder.dataTitle + "</li><li>@" + imageDataHolder.dataAuthor + "</li></ul></a>");
+                    newGalleryString += "<a href='" + imageDataHolder.dataHref + "' class='picture hidden' data-order='" + i + "'><img src='" + imageDataHolder.dataImage + "' /><ul><li>" + imageDataHolder.dataTitle + "</li><li>@" + imageDataHolder.dataAuthor + "</li></ul></a>";
+                    pageing += "<a href='#' class='pageing' data-position=" + i + ">" + (i + 1) + "</a>";
                 }
-                $(newGallery).append("<div class='navigationHolder'><a href='#' class='navigation' data-position='next'>></a></div>");
-                pageing = $("<ul class='pageingUl'></ul>");
-                $(newGallery).append(pageing);
-                for (i = 0; i < data.length; i += 1) {
-                    $(pageing).append("<li><a href='#' class='pageing' data-position=" + i + ">" + (i + 1) + "</a></li>");
-                }
-            },
-            
-            /**
-             * Destroy old gallery data from parentElemen
-             * @return void
-             */
-            destroyOldData = function () {
-                var i = 0;
-                for (i = 0; i < data.length; i += 1) {
-                    if ($(data[i]).attr("class") === "gallery") {
-                        $(data[i]).remove();
-                    }
-                }
+                
+                $(parentElement).children().addClass("hidden");
+                newGalleryString += "<div class='navigationHolder' data-position='next'><a href='#' class='navigation' data-position='next'>></a></div><ul class='pageingUl'>" + pageing + "</ul></div>";
+                newGallery = $(newGalleryString);
+                $(parentElement).append(newGallery);
             },
             
             /**
              * Highlight currently selected page
-             * @param int futurePage
+             * @param int pastPage
              * @return void
              */
-            highlitePage = function (futurePage) {
-                var i = 0,
-                    pages = $(newGallery).children(".pageingUl").children();
-                for (i = 0; i <= numberOfChlids; i += 1) {
-                    if (parseInt($(pages[i]).children('.pageing').attr("data-position"), 10) === futurePage) {
-                        $(pages[i]).children('.pageing').addClass('highlight');
-                    } else {
-                        $(pages[i]).children('.pageing').removeClass('highlight');
-                    }
-                }
+            highlitePage = function (pastPosition) {
+                $(newGallery).children(".pageingUl").children(".pageing[data-position*=" + pastPosition + "]").removeClass('highlight');
+                $(newGallery).children(".pageingUl").children(".pageing[data-position*=" + settings.position + "]").addClass('highlight');
             },
             
             /**
              * Show/Hide navigation arrows
-             * @param int futurePosition
              * @return void
              */
-            manageNavigation = function (futurePosition) {
-                var navHolder = $(newGallery).children('.navigationHolder');
-                $(navHolder[0]).children(".navigation").removeClass('hidden');
-                $(navHolder[1]).children(".navigation").removeClass('hidden');
-                if (futurePosition <= 0) {
-                    $(navHolder[0]).children(".navigation").addClass('hidden');
-                } else if (futurePosition >= numberOfChlids) {
-                    $(navHolder[1]).children(".navigation").addClass('hidden');
+            manageNavigation = function () {
+                if (settings.position === 0) {
+                    $(newGallery).children(".navigationHolder[data-position=prev]").children(".navigation").addClass("hidden");
+                    $(newGallery).children(".navigationHolder[data-position=next]").children(".navigation").removeClass("hidden");
+                } else if (settings.position === numberOfChlids) {
+                    $(newGallery).children(".navigationHolder[data-position=next]").children(".navigation").addClass("hidden");
+                    $(newGallery).children(".navigationHolder[data-position=prev]").children(".navigation").removeClass("hidden");
+                } else {
+                    $(newGallery).children(".navigationHolder[data-position=prev]").children(".navigation").removeClass("hidden");
+                    $(newGallery).children(".navigationHolder[data-position=next]").children(".navigation").removeClass("hidden");
                 }
-            },
-            
-            /**
-             * Get currently selected page
-             * @return int currentPosition
-             */
-            getCurrentPosition = function () {
-                var i = 0,
-                    children = null,
-                    currentPosition = 0;
-                for (i = 0; i < newGallery.children().length; i += 1) {
-                    children = newGallery.children()[i];
-                    if ($(children).hasClass("picture") && $(children).is(":visible")) {
-                        currentPosition = parseInt($(children).attr("data-order"), 10);
-                    }
-                }
-                return currentPosition;
             },
             
             /**
@@ -122,37 +86,28 @@
              * @return void
              */
             goToPage = function (dataPosition) {
-                var currentPosition = getCurrentPosition(),
-                    children = null,
-                    i = 0;
+                var children = null,
+                    i,
+                    pastPosition = settings.position;
                 
+                $(newGallery).children(".picture[data-order*=" + pastPosition + "]").addClass('hidden');
                 if (dataPosition === "next") {
-                    settings.position = currentPosition + 1;
+                    settings.position++;
                     if (settings.position > numberOfChlids) {settings.position = numberOfChlids; }
                 } else if (dataPosition === "prev") {
-                    settings.position = currentPosition - 1;
+                    settings.position--;
                     if (settings.position < 0) {settings.position = 0; }
                 } else {
-                    settings.position = parseInt(dataPosition, 10);
+                    settings.position = parseInt(dataPosition);
                 }
                 
-                highlitePage(settings.position);
-                manageNavigation(settings.position);
-                for (i = 0; i < newGallery.children().length; i += 1) {
-                    children = newGallery.children()[i];
-                    if ($(children).hasClass('picture')) {
-                        if (parseInt($(children).attr("data-order"), 10) === settings.position) {
-                            $(children).removeClass("hidden");
-                        } else {
-                            $(children).addClass("hidden");
-                        }
-                    }
-                }
+                highlitePage(pastPosition);
+                manageNavigation();
+                $(newGallery).children(".picture[data-order*=" + settings.position + "]").removeClass('hidden');
             };
         
         if (settings.position > 0) {settings.position -= 1; }
         appendNewGallery();
-        destroyOldData();
         goToPage(settings.position);
         $(parentElement).on("click", '.navigation', function () {
             goToPage($(this).attr("data-position"));
